@@ -247,8 +247,6 @@ with gr.Blocks(
             outputs=[resultado],
         )
 
-app = gr.mount_gradio_app(None, iface, path="/")
-
 if __name__ == "__main__":
     iface.launch(
         server_port=7861,
