@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+from datetime import datetime
 
 def buscar_proposicoes(termo):
     """
@@ -61,7 +62,14 @@ def buscar_proposicoes(termo):
                 print(f"Erro ao buscar {tipo}: {str(e)}")
                 continue
         
-        return resultados
+        if resultados:
+            return resultados
+        else:
+            # Adiciona mensagem sugerindo especificar o tipo
+            tipos_exemplo = ", ".join(TIPOS_PROPOSICOES[:3])  # Mostra só os 3 primeiros como exemplo
+            return [{'titulo': f"Nenhuma proposição encontrada com número {numero}/{ano}. \n\nTente especificar o tipo, por exemplo:\n- {tipos_exemplo} {numero}/{ano}",
+                    'id': None,
+                    'link': None}]
     
     # Busca normal por termo
     url = "https://www.camara.leg.br/busca-portal/proposicoes"
@@ -106,50 +114,53 @@ def consultar_tramitacao_web(id_proposicao):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Extrai informações básicas
-        titulo = soup.find('h3', class_='proposicao-titulo')
-        ementa = soup.find('div', class_='ementa-proposicao')
-        situacao = soup.find('div', class_='situacao-proposicao')
+        # Busca a tabela de tramitação
+        tabela_tramitacao = soup.find('table', {'id': 'content-tramitacao'}) or \
+                           soup.find('table', class_='table')
         
-        # Extrai informações de tramitação
-        tabela_tramitacao = soup.find('table', {'id': 'content-tramitacao'})
         tramitacoes = []
-        
         if tabela_tramitacao:
-            for linha in tabela_tramitacao.find_all('tr')[1:]:
+            for linha in tabela_tramitacao.find_all('tr')[1:]:  # Pula o cabeçalho
                 colunas = linha.find_all('td')
                 if len(colunas) >= 3:
-                    data = colunas[0].text.strip()
+                    data_str = colunas[0].text.strip()
+                    try:
+                        # Converte data para ordenação
+                        data_obj = datetime.strptime(data_str, '%d/%m/%Y')
+                        data = data_str
+                    except:
+                        data_obj = datetime.min
+                        data = data_str
+                    
                     orgao = colunas[1].text.strip()
                     despacho = colunas[2].text.strip()
                     
                     tramitacoes.append({
                         'data': data,
+                        'data_obj': data_obj,
                         'orgao': orgao,
                         'despacho': despacho
                     })
         
-        # Formata a resposta
-        resposta = f"""
-Informações da página web:
-------------------------
-Título: {titulo.text.strip() if titulo else 'N/A'}
-Ementa: {ementa.text.strip() if ementa else 'N/A'}
-Situação: {situacao.text.strip() if situacao else 'N/A'}
-
-Últimas tramitações:"""
+        # Ordena tramitações por data mais recente
+        tramitacoes.sort(key=lambda x: x['data_obj'], reverse=True)
         
-        for tram in tramitacoes[:5]:
-            resposta += f"""
-Data: {tram['data']}
-Órgão: {tram['orgao']}
-Despacho: {tram['despacho']}
-------------------------"""
+        # Formata a resposta apenas se tiver informações adicionais
+        resposta = ""
+        if tramitacoes:
+            resposta += "\nHistórico de tramitações:"
+            for tram in tramitacoes[:5]:  # Mostra as 5 mais recentes
+                resposta += f"\n\n📅 {tram['data']}"
+                resposta += f"\n📍 {tram['orgao']}"
+                if tram['despacho'].strip():
+                    resposta += f"\n📝 {tram['despacho']}"
+                resposta += "\n---"
         
-        return resposta
-    
+        return resposta if resposta else ""
+        
     except Exception as e:
-        return f"Erro ao consultar página web: {str(e)}"
+        print(f"Erro ao consultar página web: {str(e)}")  # Debug
+        return ""
 
 def consultar_proposicao_completa(id_ou_sigla):
     """
@@ -178,7 +189,6 @@ def consultar_proposicao_completa(id_ou_sigla):
 def consultar_proposicao(id_ou_sigla):
     """
     Consulta detalhes de uma proposição específica.
-    Pode receber tanto o ID quanto a sigla (ex: 'PL 1234/2023')
     """
     base_url = "https://dadosabertos.camara.leg.br/api/v2"
     
@@ -209,6 +219,16 @@ def consultar_proposicao(id_ou_sigla):
         # Busca tramitações
         response = requests.get(f"{base_url}/proposicoes/{id_prop}/tramitacoes")
         trams = response.json()['dados']
+        
+        # Ordena tramitações por data
+        for tram in trams:
+            try:
+                data_obj = datetime.strptime(tram['dataHora'].split('T')[0], '%Y-%m-%d')
+                tram['data_obj'] = data_obj
+            except:
+                tram['data_obj'] = datetime.min
+        
+        trams.sort(key=lambda x: x['data_obj'], reverse=True)
         ultima_tramitacao = trams[0] if trams else None
         
         # Busca informações do órgão atual
@@ -218,6 +238,11 @@ def consultar_proposicao(id_ou_sigla):
             orgaos = response.json()['dados']
             if orgaos:
                 orgao_atual = orgaos[0]
+        
+        # Gera os links
+        id_prop_str = str(id_prop)
+        link_pagina = f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={id_prop_str}"
+        link_documento = prop.get('urlInteiroTeor', '')
         
         # Formata a resposta
         resposta = f"""
@@ -231,12 +256,16 @@ Situação atual:
 {f"  Tipo: {orgao_atual['tipoOrgao']}" if orgao_atual else ""}
         
 Última tramitação:
-- Data: {ultima_tramitacao['dataHora'] if ultima_tramitacao else 'N/A'}
+- Data: {datetime.strptime(ultima_tramitacao['dataHora'], '%Y-%m-%dT%H:%M').strftime('%d/%m/%Y às %H:%M') if ultima_tramitacao else 'N/A'}
+- Órgão: {ultima_tramitacao['siglaOrgao'] if ultima_tramitacao else 'N/A'}
 - Despacho: {ultima_tramitacao['despacho'] if ultima_tramitacao else 'N/A'}
 - Descrição: {ultima_tramitacao['descricaoTramitacao'] if ultima_tramitacao else 'N/A'}
         
 Regime de tramitação: {prop['statusProposicao']['regime']}
-Link para acompanhamento: {prop['urlInteiroTeor']}"""
+
+Links:
+📄 Página da proposição: {link_pagina}
+📑 Texto completo: {link_documento}"""
 
         return resposta
         
