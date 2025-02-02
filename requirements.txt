@@ -1,3 +1,6 @@
-gradio
-beautifulsoup4
-requests 
+gradio-client==0.9.1
+gradio==3.50.2
+requests==2.31.0
+beautifulsoup4==4.12.3
+fastapi==0.109.0
+uvicorn==0.27.0.post1 
