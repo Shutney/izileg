@@ -1,5 +1,5 @@
 import gradio as gr
-from teste_consulta import buscar_proposicoes, consultar_proposicao_completa
+from . import teste_consulta
 import re
 
 def formatar_resultado(texto):
@@ -100,7 +100,7 @@ def processar_consulta(numero_pl):
         
         if match:
             pl = f"{match.group(1)} {match.group(2)}/{match.group(3)}"
-            resultado = consultar_proposicao_completa(pl)
+            resultado = teste_consulta.consultar_proposicao_completa(pl)
             return formatar_resultado(resultado)
         else:
             return """
