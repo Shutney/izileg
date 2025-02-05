@@ -4,7 +4,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
 from src.teste_consulta import consultar_proposicao_completa
-import gradio as gr
 
 app = FastAPI(title="izileg")
 
@@ -22,18 +21,4 @@ async def consulta(pl: str):
         resultado = consultar_proposicao_completa(pl)
         return {"status": "success", "data": resultado}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-iface = gr.Interface(
-    fn=processar_consulta,
-    inputs=gr.Textbox(
-        placeholder="Digite o número da proposição (exemplo: PL 2306/2020)",
-        label="",
-    ),
-    outputs=gr.HTML(),
-    title="Consulta de Proposições",
-    description="Digite o número da proposição (exemplo: PL 2306/2020)",
-    theme=gr.themes.Base()
-)
-
-app = gr.mount_gradio_app(app, iface, path="/") 
+        return {"status": "error", "message": str(e)} 

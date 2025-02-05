@@ -3,4 +3,5 @@ uvicorn
 jinja2
 requests
 python-multipart
-beautifulsoup4 
+beautifulsoup4
+aiofiles 
