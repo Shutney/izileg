@@ -1,5 +1,0 @@
-gradio>=4.0.0
-requests
-beautifulsoup4
-python-multipart
-aiohttp 
