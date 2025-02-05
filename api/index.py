@@ -8,8 +8,8 @@ import logging
 app = FastAPI(title="izileg")
 
 # Configura templates e arquivos estáticos
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="public/templates")
+app.mount("/static", StaticFiles(directory="public/static"), name="static")
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
