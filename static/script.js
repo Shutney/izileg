@@ -10,10 +10,13 @@ async function consultarPL() {
 
     try {
         resultado.innerHTML = '<div class="loading">Consultando...</div>';
+        console.log('Consultando:', pl); // Debug
+        
         // Remove espaços extras e formata a URL
         const plFormatado = pl.replace(/\s+/g, ' ').trim();
         const response = await fetch(`/consulta/${encodeURIComponent(plFormatado)}`);
         const data = await response.json();
+        console.log('Resposta:', data); // Debug
 
         if (data.status === 'success') {
             resultado.innerHTML = formatarResultado(data.data);
@@ -21,6 +24,7 @@ async function consultarPL() {
             resultado.innerHTML = `<div class="error">${data.message}</div>`;
         }
     } catch (error) {
+        console.error('Erro:', error); // Debug
         resultado.innerHTML = '<div class="error">Erro ao consultar proposição</div>';
     }
 }
