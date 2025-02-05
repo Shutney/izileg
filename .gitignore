@@ -3,20 +3,18 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Dados
-dados/
-*.csv
-
-# Virtual Environment
+# Ambiente virtual
 venv/
-ENV/
+env/
 
 # IDEs
-.idea/
 .vscode/
-*.swp
+.idea/
 
 # OS
 .DS_Store
-Thumbs.db 
-.vercel
+Thumbs.db
+
+# Dados
+dados/
+*.csv 

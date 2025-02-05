@@ -3,46 +3,33 @@ from bs4 import BeautifulSoup
 import re
 from datetime import datetime
 
+# Lista completa de tipos comuns
+TIPOS_PROPOSICOES = [
+    'PL',   # Projeto de Lei
+    'PLP',  # Projeto de Lei Complementar
+    'PEC',  # Proposta de Emenda à Constituição
+    'MPV',  # Medida Provisória
+    'PDL',  # Projeto de Decreto Legislativo
+    'PRC',  # Projeto de Resolução
+    'REQ',  # Requerimento
+    'INC',  # Indicação
+    'RIC',  # Requerimento de Informação
+    'PDC',  # Projeto de Decreto Legislativo
+]
+
 def buscar_proposicoes(termo):
     """
-    Busca proposições usando o termo de busca ou número
-    Aceita formatos:
-    - Termo de busca: "fake news"
-    - Número: "2306/2020"
-    - Sigla e número: "PL 2306/2020", "PEC 45/2019", etc
+    Busca proposições na API da Câmara
     """
-    # Lista de tipos comuns de proposições
-    TIPOS_PROPOSICOES = [
-        'PL',    # Projeto de Lei
-        'PLP',   # Projeto de Lei Complementar
-        'PEC',   # Proposta de Emenda à Constituição
-        'MPV',   # Medida Provisória
-        'PDL',   # Projeto de Decreto Legislativo
-        'PRC',   # Projeto de Resolução
-        'REQ',   # Requerimento
-        'INC',   # Indicação
-        'RIC',   # Requerimento de Informação
-        'PDC',   # Projeto de Decreto Legislativo
-    ]
-    
-    # Verifica se é uma busca por número
-    if '/' in termo:
-        resultados = []
-        numero_ano = termo
+    try:
+        # Remove espaços extras e formata o termo
+        termo = termo.strip()
         
-        # Se tem sigla específica
-        if ' ' in termo:
-            sigla, numero_ano = termo.split(' ')
-            tipos_busca = [sigla.upper()]
-        else:
-            # Se não tem sigla, busca em todos os tipos
-            tipos_busca = TIPOS_PROPOSICOES
-        
-        numero, ano = numero_ano.split('/')
-        
-        # Busca em cada tipo de proposição
-        for tipo in tipos_busca:
-            try:
+        # Se for apenas números e barra (ex: "2306/2020")
+        if re.match(r'^\d+/\d+$', termo):
+            numero, ano = termo.split('/')
+            resultados = []
+            for tipo in TIPOS_PROPOSICOES:
                 url = "https://dadosabertos.camara.leg.br/api/v2/proposicoes"
                 params = {
                     'siglaTipo': tipo,
@@ -51,58 +38,166 @@ def buscar_proposicoes(termo):
                 }
                 response = requests.get(url, params=params)
                 dados = response.json()['dados']
-                
-                for prop in dados:
+                if dados:
                     resultados.append({
-                        'titulo': f"{prop['siglaTipo']} {prop['numero']}/{prop['ano']} - {prop['ementa'][:100]}...",
-                        'id': prop['id'],
-                        'link': f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={prop['id']}"
+                        'titulo': f"{dados[0]['siglaTipo']} {dados[0]['numero']}/{dados[0]['ano']}",
+                        'id': dados[0]['id'],
+                        'link': f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={dados[0]['id']}"
                     })
-            except Exception as e:
-                print(f"Erro ao buscar {tipo}: {str(e)}")
-                continue
-        
-        if resultados:
             return resultados
-        else:
-            # Adiciona mensagem sugerindo especificar o tipo
-            tipos_exemplo = ", ".join(TIPOS_PROPOSICOES[:3])  # Mostra só os 3 primeiros como exemplo
-            return [{'titulo': f"Nenhuma proposição encontrada com número {numero}/{ano}. \n\nTente especificar o tipo, por exemplo:\n- {tipos_exemplo} {numero}/{ano}",
-                    'id': None,
-                    'link': None}]
-    
-    # Busca normal por termo
-    url = "https://www.camara.leg.br/busca-portal/proposicoes"
-    params = {
-        'pagina': 1,
-        'ordem': 'relevancia',
-        'q': termo
-    }
-    
-    try:
-        response = requests.get(url, params=params)
-        soup = BeautifulSoup(response.text, 'html.parser')
+            
+        # Se já vier com o tipo (ex: "PL 2306/2020")
+        elif ' ' in termo:
+            sigla, numero_ano = termo.split(' ')
+            numero, ano = numero_ano.split('/')
+            url = "https://dadosabertos.camara.leg.br/api/v2/proposicoes"
+            params = {
+                'siglaTipo': sigla.upper(),
+                'numero': numero,
+                'ano': ano
+            }
+            response = requests.get(url, params=params)
+            dados = response.json()['dados']
+            if dados:
+                return [{
+                    'titulo': f"{dados[0]['siglaTipo']} {dados[0]['numero']}/{dados[0]['ano']}",
+                    'id': dados[0]['id'],
+                    'link': f"https://www.camara.leg.br/proposicoesWeb/fichadetramitacao?idProposicao={dados[0]['id']}"
+                }]
         
-        resultados = []
-        items = soup.find_all('div', class_='resultItemContent')
-        
-        for item in items:
-            titulo = item.find('a', class_='nomeProposicao')
-            if titulo:
-                link = titulo.get('href', '')
-                id_prop = re.search(r'idProposicao=(\d+)', link)
-                if id_prop:
-                    resultados.append({
-                        'titulo': titulo.text.strip(),
-                        'id': id_prop.group(1),
-                        'link': f"https://www.camara.leg.br{link}"
-                    })
-        
-        return resultados
-    
-    except Exception as e:
-        print(f"Erro na busca: {str(e)}")
         return []
+        
+    except Exception as e:
+        print(f"Erro ao buscar proposições: {str(e)}")
+        return []
+
+def formatar_erro_busca():
+    return """
+[TITULO]Como pesquisar proposições[/TITULO]
+
+[INFO]
+Digite o tipo e número da proposição ou apenas o número para ver todas as opções.
+
+Exemplos de busca:
+• PL 2306/2020 (Projeto de Lei)
+• PEC 45/2019 (Proposta de Emenda à Constituição)
+• REQ 123/2024 (Requerimento)
+• MPV 1172/2023 (Medida Provisória)
+• 2306/2020 (busca em todos os tipos)
+
+Tipos disponíveis:
+• PL  - Projeto de Lei
+• PLP - Projeto de Lei Complementar
+• PEC - Proposta de Emenda à Constituição
+• MPV - Medida Provisória
+• PDL - Projeto de Decreto Legislativo
+• PRC - Projeto de Resolução
+• REQ - Requerimento
+• INC - Indicação
+• RIC - Requerimento de Informação
+[/INFO]
+"""
+
+def consultar_proposicao_completa(pl):
+    """
+    Consulta detalhes completos de uma proposição
+    """
+    try:
+        resultados = buscar_proposicoes(pl)
+        if not resultados:
+            return formatar_erro_busca()
+        
+        if len(resultados) > 1:
+            # Formata múltiplos resultados
+            resposta = "[TITULO]Proposições encontradas[/TITULO]\n"
+            resposta += "Encontramos várias proposições com este número:\n\n"
+            for res in resultados:
+                resposta += f"• {res['titulo']}\n"
+            resposta += "\nPor favor, especifique o tipo (ex: PL, PEC, etc)"
+            return resposta
+            
+        id_prop = resultados[0]['id']
+        
+        # Consulta detalhes via API
+        url = f"https://dadosabertos.camara.leg.br/api/v2/proposicoes/{id_prop}"
+        response = requests.get(url)
+        prop = response.json()['dados']
+        
+        # Consulta órgão atual
+        orgao_atual = None
+        if 'statusProposicao' in prop and 'siglaOrgao' in prop['statusProposicao']:
+            response = requests.get("https://dadosabertos.camara.leg.br/api/v2/orgaos", 
+                                 params={'sigla': prop['statusProposicao']['siglaOrgao']})
+            orgaos = response.json()['dados']
+            if orgaos:
+                orgao_atual = orgaos[0]
+        
+        # Consulta tramitações
+        url_tram = f"https://dadosabertos.camara.leg.br/api/v2/proposicoes/{id_prop}/tramitacoes"
+        response = requests.get(url_tram)
+        trams = response.json()['dados']
+        
+        # Ordena tramitações por data mais recente
+        trams.sort(key=lambda x: x['dataHora'], reverse=True)
+        ultima_tramitacao = trams[0] if trams else None
+        
+        # Busca autores
+        url_autores = f"https://dadosabertos.camara.leg.br/api/v2/proposicoes/{id_prop}/autores"
+        response = requests.get(url_autores)
+        autores = response.json()['dados']
+        
+        # Processa autores
+        autores_info = []
+        
+        for i, autor in enumerate(autores):
+            if i >= 2:  # Se tiver mais de 2 autores
+                autores_info.append("e outros")
+                break
+                
+            nome_autor = autor.get('nome', 'N/A')
+            partido_uf = "N/A"
+            
+            # Busca partido/UF de cada autor
+            if autor.get('uri'):
+                id_deputado = autor['uri'].split('/')[-1]
+                url_deputado = f"https://dadosabertos.camara.leg.br/api/v2/deputados/{id_deputado}"
+                response = requests.get(url_deputado)
+                if response.status_code == 200:
+                    deputado = response.json()['dados']
+                    ultimo_status = deputado.get('ultimoStatus', {})
+                    partido = ultimo_status.get('siglaPartido', '')
+                    uf = ultimo_status.get('siglaUf', '')
+                    if partido and uf:
+                        partido_uf = f"{partido}/{uf}"
+            
+            autores_info.append(f"{nome_autor} ({partido_uf})")
+        
+        # Formata os autores com seus respectivos partidos/UF
+        autores_formatado = ", ".join(autores_info)
+        
+        # Formata a resposta
+        resposta = f"""
+[TITULO]{prop['siglaTipo']} {prop['numero']}/{prop['ano']}[/TITULO]
+{prop['ementa']}
+
+[SUBTITULO]Informações[/SUBTITULO]
+• Autor{'es' if len(autores_info) > 1 else 'a' if 'Deputada' in autores[0].get('nome', '') else ''}: {autores_formatado}
+• Status: {prop['statusProposicao']['descricaoSituacao']}
+• Órgão: {prop['statusProposicao']['siglaOrgao']} - {orgao_atual['nome'] if orgao_atual else 'N/A'}
+• Regime: {prop['statusProposicao']['regime']}
+
+[SUBTITULO]Última atualização[/SUBTITULO]
+{datetime.strptime(ultima_tramitacao['dataHora'], '%Y-%m-%dT%H:%M').strftime('%d/%m/%Y às %H:%M') if ultima_tramitacao else 'N/A'}
+{ultima_tramitacao['despacho'] if ultima_tramitacao else 'N/A'}
+
+[SUBTITULO]Links[/SUBTITULO]
+Página da proposição: <a href="{resultados[0]['link']}" target="_blank">{resultados[0]['link']}</a>
+Texto completo: <a href="{prop.get('urlInteiroTeor', '#')}" target="_blank">{prop.get('urlInteiroTeor', 'N/A')}</a>
+"""
+        return resposta
+        
+    except Exception as e:
+        return f"Erro ao consultar proposição: {str(e)}"
 
 def consultar_tramitacao_web(id_proposicao):
     """
@@ -161,30 +256,6 @@ def consultar_tramitacao_web(id_proposicao):
     except Exception as e:
         print(f"Erro ao consultar página web: {str(e)}")  # Debug
         return ""
-
-def consultar_proposicao_completa(id_ou_sigla):
-    """
-    Consulta informações tanto da API quanto da página web
-    """
-    # Primeiro consulta a API
-    resultado_api = consultar_proposicao(id_ou_sigla)
-    
-    # Se for uma sigla, precisa obter o ID
-    if isinstance(id_ou_sigla, str):
-        sigla_tipo, numero_ano = id_ou_sigla.split(' ')
-        numero, ano = numero_ano.split('/')
-        response = requests.get(
-            "https://dadosabertos.camara.leg.br/api/v2/proposicoes",
-            params={'siglaTipo': sigla_tipo, 'numero': numero, 'ano': ano}
-        )
-        dados = response.json()['dados']
-        if dados:
-            id_prop = dados[0]['id']
-            # Consulta a página web
-            resultado_web = consultar_tramitacao_web(id_prop)
-            return f"{resultado_api}\n\n{resultado_web}"
-    
-    return resultado_api
 
 def consultar_proposicao(id_ou_sigla):
     """

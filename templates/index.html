@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>izileg</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <h1>izi<span>leg</span></h1>
+            <p>Consulta simplificada de proposições</p>
+        </div>
+    </header>
+
+    <main>
+        <div class="search-container">
+            <div class="search-info">
+                <p>Você pode pesquisar de várias formas:</p>
+                <ul>
+                    <li>Projetos de Lei: <code>PL 2306/2020</code></li>
+                    <li>Requerimentos: <code>REQ 1234/2024</code></li>
+                    <li>PEC: <code>PEC 45/2019</code></li>
+                    <li>Apenas número: <code>2306/2020</code> (mostra todas as opções)</li>
+                </ul>
+            </div>
+            <input type="text" id="pl-input" 
+                   placeholder="Digite o número (exemplo: PL 2306/2020)"
+                   autocomplete="off">
+            <button onclick="consultarPL()">Consultar</button>
+        </div>
+
+        <div id="resultado" class="resultado-container"></div>
+    </main>
+
+    <script src="{{ url_for('static', path='/script.js') }}"></script>
+</body>
+</html> 
